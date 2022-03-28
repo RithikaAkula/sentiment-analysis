@@ -1,3 +1,4 @@
+import keras
 from keras.models import Sequential
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -13,13 +14,15 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import time
 import cv2
 import random
 from numpy import *
 from PIL import Image
 import theano
 from keras.utils import np_utils
-
+import numba
+from numba import jit, cuda
 
 '''
 The sentences were presented using different emotion (in parentheses is the three letter code used in the third part of the filename):
@@ -45,6 +48,7 @@ SENTIMENTS = ['ANG','DIS','FEA','HAP','NEU','SAD']
 IMG_SIZE=277 # as required by AlexNet
 
 ''' CREATING TensorFlow Dataset representations '''
+@numba.jit
 def create_dataset(img_folder):
     img_data_array=[]
     class_ids=[]
@@ -73,7 +77,6 @@ test_images, test_labels = create_dataset(path_to_splits+'test/')
 validation_images, validation_labels = create_dataset(path_to_splits+'validation/')
 
 ''' converting labels to categorical data '''
-from keras.utils import np_utils
 train_labels = np_utils.to_categorical(train_labels, 6)
 test_labels = np_utils.to_categorical(test_labels, 6)
 validation_labels = np_utils.to_categorical(validation_labels, 6)
@@ -83,9 +86,14 @@ validation_labels = np_utils.to_categorical(validation_labels, 6)
 
 
 ''' Converting to TensorFlow Dataset representation '''
-train_ds = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
-test_ds = tf.data.Dataset.from_tensor_slices((test_images, test_labels))
-validation_ds = tf.data.Dataset.from_tensor_slices((validation_images, validation_labels))
+@numba.jit
+def convert_to_tfds(images_array, labels):
+    return tf.data.Dataset.from_tensor_slices((images_array, labels))
+
+
+train_ds = convert_to_tfds(train_images, train_labels)
+test_ds = convert_to_tfds(test_images, test_labels)
+validation_ds = convert_to_tfds(validation_images, validation_labels)
 
 
 ''' Get the size of dataset partitions '''
@@ -108,5 +116,53 @@ validation_ds = (validation_ds
                   .shuffle(buffer_size=train_ds_size)
                   .batch(batch_size=32, drop_remainder=True))
 
+''' ALEX-NET MODEL IMPLEMENTATION '''
+model = keras.models.Sequential([
+    keras.layers.Conv2D(filters=96, kernel_size=(11,11), strides=(4,4), activation='relu', input_shape=(227,227,3)),
+    keras.layers.BatchNormalization(),
+    keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
+    keras.layers.Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), activation='relu', padding="same"),
+    keras.layers.BatchNormalization(),
+    keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
+    keras.layers.Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+    keras.layers.BatchNormalization(),
+    keras.layers.Conv2D(filters=384, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+    keras.layers.BatchNormalization(),
+    keras.layers.Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
+    keras.layers.BatchNormalization(),
+    keras.layers.MaxPool2D(pool_size=(3,3), strides=(2,2)),
+    keras.layers.Flatten(),
+    keras.layers.Dense(4096, activation='relu'),
+    keras.layers.Dropout(0.5),
+    keras.layers.Dense(4096, activation='relu'),
+    keras.layers.Dropout(0.5),
+    keras.layers.Dense(10, activation='softmax')
+])
 
 
+''' TENSORBOARD '''
+root_logdir = os.path.join(os.curdir, "logs\\fit\\")
+def get_run_logdir():
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    return os.path.join(root_logdir, run_id)
+run_logdir = get_run_logdir()
+tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
+
+''' COMPILE THE MODEL '''
+model.compile(loss='sparse_categorical_crossentropy', optimizer=tf.optimizers.SGD(learning_rate=0.001), metrics=['accuracy'])
+model.summary()
+
+
+'''' TRAIN THE NETWORK '''
+def train_model(model):
+    model.fit(train_ds,
+            epochs=50,
+            validation_data=validation_ds,
+            validation_freq=1,
+            callbacks=[tensorboard_cb])
+
+train_model(model)
+
+
+''' EVALUATE THE MODEL '''
+model.evaluate(test_ds)
