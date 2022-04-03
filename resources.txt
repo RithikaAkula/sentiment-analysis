@@ -1,0 +1,4 @@
+https://machinelearningmastery.com/understand-the-dynamics-of-learning-rate-on-deep-learning-neural-networks/#:~:text=The%20amount%20that%20the%20weights,range%20between%200.0%20and%201.0.
+
+https://analyticsindiamag.com/how-to-use-learning-rate-annealing-with-neural-networks/
+
