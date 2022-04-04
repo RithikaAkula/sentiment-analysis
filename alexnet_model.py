@@ -1,7 +1,6 @@
 import keras
 from keras.models import Sequential
 import tensorflow as tf
-import tensorflow_datasets as tfds
 from keras.layers.core import Dense, Activation, Dropout, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 # from keras.optimizers import SGD, RMSprop, adam
@@ -10,19 +9,13 @@ from sklearn.tree import DecisionTreeClassifier # Import Decision Tree Classifie
 from sklearn import metrics
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 import time
 import cv2
-import random
 from numpy import *
-from PIL import Image
-import theano
 from keras.utils import np_utils
-import numba
-from numba import jit, cuda
+
 
 '''
 The sentences were presented using different emotion (in parentheses is the three letter code used in the third part of the filename):
@@ -48,7 +41,6 @@ SENTIMENTS = ['ANG','DIS','FEA','HAP','NEU','SAD']
 IMG_SIZE=277 # as required by AlexNet
 
 ''' CREATING TensorFlow Dataset representations '''
-@numba.jit
 def create_dataset(img_folder):
     img_data_array=[]
     class_ids=[]
@@ -86,7 +78,6 @@ validation_labels = np_utils.to_categorical(validation_labels, 6)
 
 
 ''' Converting to TensorFlow Dataset representation '''
-@numba.jit
 def convert_to_tfds(images_array, labels):
     return tf.data.Dataset.from_tensor_slices((images_array, labels))
 

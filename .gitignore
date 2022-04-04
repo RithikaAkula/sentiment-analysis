@@ -128,5 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Removing dataset folder
+# Removing dataset folders
 dataset/
+dataset2/

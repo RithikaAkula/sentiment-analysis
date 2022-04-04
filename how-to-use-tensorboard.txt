@@ -1,0 +1,5 @@
+Open up a terminal at the directory level where the TensorBoard log folder exists and run the following command:
+
+tensorboard --logdir logs
+
+Follow the instructions on the terminal and navigate to ‘localhost:6006’ (this could be a different port number for you).
